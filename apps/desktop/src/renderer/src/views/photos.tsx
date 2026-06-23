@@ -118,6 +118,12 @@ export function Photos() {
             </button>
           ))}
         </div>
+        {view.length === 0 && (
+          <p className="mt-2 text-sm text-ink2">
+            Nessun elemento. Con l’iPhone collegato e autorizzato, la lettura richiede pymobiledevice3 in resources/bin.
+            Anteprime e metadati arrivano nel passo successivo.
+          </p>
+        )}
       </div>
     </div>
   )

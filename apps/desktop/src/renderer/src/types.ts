@@ -1,5 +1,8 @@
 export interface DeviceStatus {
+  mode?: 'demo' | 'device' | 'none'
+  toolsOk?: boolean
   connected: boolean
+  trusted?: boolean
   name?: string
   usedBytes?: number
   totalBytes?: number

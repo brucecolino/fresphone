@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { useTheme } from '../store/theme'
 import { cn } from '../lib/cn'
 
@@ -10,6 +11,17 @@ const modes = [
 export function Settings() {
   const source = useTheme((s) => s.source)
   const setSource = useTheme((s) => s.setSource)
+  const [demo, setDemo] = useState(false)
+
+  useEffect(() => {
+    window.fp.settings.get().then((s) => setDemo(Boolean((s as { demo?: boolean }).demo)))
+  }, [])
+
+  async function toggleDemo(v: boolean) {
+    setDemo(v)
+    await window.fp.settings.set({ demo: v })
+    location.reload()
+  }
 
   return (
     <div className="max-w-2xl p-6">
@@ -31,6 +43,18 @@ export function Settings() {
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="mt-4 rounded-xl2 border border-line bg-surface p-5">
+        <h2 className="font-display font-semibold">Dispositivo</h2>
+        <label className="mt-3 flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={demo} onChange={(e) => void toggleDemo(e.target.checked)} />
+          Modalità demo (dati di esempio senza iPhone)
+        </label>
+        <p className="mt-2 text-xs text-ink2">
+          Disattivala per usare l’iPhone reale: servono i binari libimobiledevice in <code>resources/bin</code> e
+          l’Apple Mobile Device Driver.
+        </p>
       </div>
 
       <div className="mt-4 rounded-xl2 border border-line bg-surface p-5">

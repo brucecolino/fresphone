@@ -24,6 +24,24 @@ export function Sidebar({ active, onSelect }: { active: NavKey; onSelect: (k: Na
   const pct =
     status?.usedBytes && status?.totalBytes ? Math.min(100, (status.usedBytes / status.totalBytes) * 100) : 0
 
+  const title =
+    status?.mode === 'demo'
+      ? 'iPhone (demo)'
+      : status?.connected
+        ? status.name ?? 'iPhone'
+        : status?.toolsOk === false
+          ? 'Strumenti non installati'
+          : 'Nessun iPhone'
+
+  const subtitle =
+    status?.mode === 'demo'
+      ? 'Modalità demo attiva'
+      : status?.connected && !status.trusted
+        ? 'Autorizza sul telefono'
+        : status?.toolsOk === false
+          ? 'Vedi resources/bin'
+          : 'Collega il dispositivo'
+
   return (
     <nav className="flex w-44 shrink-0 flex-col gap-1 border-r border-line bg-side p-3">
       {items.map((it) => (
@@ -40,8 +58,8 @@ export function Sidebar({ active, onSelect }: { active: NavKey; onSelect: (k: Na
       ))}
 
       <div className="mt-auto rounded-lg border border-line p-3 text-xs">
-        <p className="font-medium">{status?.connected ? status.name : 'Nessun iPhone'}</p>
-        {status?.connected && status.totalBytes ? (
+        <p className="font-medium">{title}</p>
+        {status?.connected && status.trusted && status.totalBytes ? (
           <>
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-line">
               <div className="bg-grad h-full" style={{ width: `${pct}%` }} />
@@ -51,7 +69,7 @@ export function Sidebar({ active, onSelect }: { active: NavKey; onSelect: (k: Na
             </p>
           </>
         ) : (
-          <p className="mt-1 text-ink2">Collega il dispositivo</p>
+          <p className="mt-1 text-ink2">{subtitle}</p>
         )}
       </div>
     </nav>

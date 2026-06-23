@@ -1,7 +1,7 @@
 import { app, BrowserWindow, nativeTheme, ipcMain, shell } from 'electron'
 import { join } from 'node:path'
 import { readSettings, writeSettings, type ThemeSource } from './settings'
-import { mockEngine } from './device/mock'
+import { getState, listItems, pair } from './device/manager'
 import type { SourceKey } from './device/engine'
 
 let win: BrowserWindow | null = null
@@ -59,8 +59,9 @@ app.whenReady().then(() => {
     writeSettings(s)
     return s
   })
-  ipcMain.handle('device:status', () => mockEngine.getStatus())
-  ipcMain.handle('device:list', (_e, source: SourceKey) => mockEngine.list(source))
+  ipcMain.handle('device:status', () => getState())
+  ipcMain.handle('device:list', (_e, source: SourceKey) => listItems(source))
+  ipcMain.handle('device:pair', () => pair())
 
   nativeTheme.on('updated', () => {
     win?.webContents.send('theme:changed', { source: nativeTheme.themeSource, resolved: resolvedTheme() })

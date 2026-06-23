@@ -8,9 +8,11 @@ export interface Settings {
   theme: ThemeSource
   exportDir?: string
   language?: string
+  /** Modalità demo: usa dati di esempio anche senza iPhone collegato. */
+  demo?: boolean
 }
 
-const defaults: Settings = { theme: 'system', language: 'it' }
+const defaults: Settings = { theme: 'system', language: 'it', demo: false }
 
 function file(): string {
   return join(app.getPath('userData'), 'settings.json')

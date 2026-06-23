@@ -63,6 +63,7 @@ export function Files() {
           </div>
         ))}
       </div>
+      {view.length === 0 && <p className="mt-3 text-sm text-ink2">Nessun file.</p>}
     </div>
   )
 }
