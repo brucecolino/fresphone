@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { PLANS, formatEur, isPaidPlan, type PlanId } from '@freshphone/shared'
+import { CheckoutButtons } from '@/components/checkout-buttons'
 
 export const metadata: Metadata = {
   title: 'Checkout — FreshPhone',
@@ -40,24 +41,10 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
             </div>
           </div>
 
-          <div className="mt-6 space-y-3">
-            <button
-              disabled
-              className="bg-grad w-full rounded-full px-4 py-3 text-sm font-semibold text-white opacity-60"
-            >
-              Paga con carta (Stripe)
-            </button>
-            <button
-              disabled
-              className="w-full rounded-full border border-line px-4 py-3 text-sm font-semibold text-ink opacity-60"
-            >
-              Paga con PayPal
-            </button>
-          </div>
+          <CheckoutButtons plan={planId} />
 
-          <p className="mt-5 rounded-lg bg-grad-soft p-3 text-xs text-ink2">
-            Il pagamento è in fase di attivazione: stiamo collegando Stripe e PayPal. Appena pronto, qui completerai
-            l’acquisto e riceverai subito la licenza nell’area personale.
+          <p className="mt-5 text-xs text-ink2">
+            Pagamento sicuro. Dopo l’acquisto ricevi subito la licenza via email e nell’area personale.
           </p>
         </div>
 
