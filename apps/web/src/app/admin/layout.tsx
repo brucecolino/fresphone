@@ -8,7 +8,7 @@ const nav: { href: string; label: string; ready: boolean }[] = [
   { href: '/admin', label: 'Dashboard', ready: true },
   { href: '/admin/orders', label: 'Ordini', ready: true },
   { href: '/admin/licenses', label: 'Licenze', ready: false },
-  { href: '/admin/carts', label: 'Carrelli', ready: false },
+  { href: '/admin/carts', label: 'Carrelli', ready: true },
   { href: '/admin/promos', label: 'Codici promo', ready: false },
   { href: '/admin/newsletter', label: 'Newsletter', ready: false },
   { href: '/admin/settings', label: 'Impostazioni', ready: false },
