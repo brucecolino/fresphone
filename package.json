@@ -8,7 +8,7 @@
     "node": ">=20"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["@prisma/client", "@prisma/engines", "prisma", "sharp", "esbuild"]
+    "onlyBuiltDependencies": ["@prisma/client", "@prisma/engines", "prisma", "sharp", "esbuild", "electron", "electron-builder"]
   },
   "scripts": {
     "web:dev": "pnpm --filter @freshphone/web dev",

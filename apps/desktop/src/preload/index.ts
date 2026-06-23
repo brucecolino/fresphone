@@ -1,0 +1,36 @@
+import { contextBridge, ipcRenderer } from 'electron'
+
+type ThemeSource = 'system' | 'light' | 'dark'
+interface ThemeState {
+  source: ThemeSource
+  resolved: 'light' | 'dark'
+}
+
+const api = {
+  theme: {
+    get: (): Promise<ThemeState> => ipcRenderer.invoke('theme:get'),
+    set: (s: ThemeSource): Promise<ThemeState> => ipcRenderer.invoke('theme:set', s),
+    onChanged: (cb: (s: ThemeState) => void): (() => void) => {
+      const handler = (_e: unknown, s: ThemeState): void => cb(s)
+      ipcRenderer.on('theme:changed', handler)
+      return () => ipcRenderer.removeListener('theme:changed', handler)
+    },
+  },
+  settings: {
+    get: (): Promise<Record<string, unknown>> => ipcRenderer.invoke('settings:get'),
+    set: (patch: Record<string, unknown>): Promise<Record<string, unknown>> =>
+      ipcRenderer.invoke('settings:set', patch),
+  },
+  device: {
+    status: (): Promise<unknown> => ipcRenderer.invoke('device:status'),
+    list: (source: string): Promise<unknown[]> => ipcRenderer.invoke('device:list', source),
+  },
+}
+
+if (process.contextIsolated) {
+  contextBridge.exposeInMainWorld('fp', api)
+} else {
+  ;(globalThis as unknown as { fp: typeof api }).fp = api
+}
+
+export type FpApi = typeof api

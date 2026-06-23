@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #f6f8fa;
+  --surface: #ffffff;
+  --side: #ffffff;
+  --ink: #16242c;
+  --ink2: #5a6b75;
+  --line: #e6ecf1;
+  --brand: #1fa08c;
+  --pill: #e6f6f1;
+  --pillt: #15715e;
+  --grad: linear-gradient(120deg, #2c6e9c 0%, #29a99b 55%, #57c98a 100%);
+  --grad-soft: linear-gradient(120deg, rgba(44, 110, 156, 0.12), rgba(87, 201, 138, 0.12));
+}
+
+.dark {
+  --bg: #0b1219;
+  --surface: #111c25;
+  --side: #0f1820;
+  --ink: #e8eef2;
+  --ink2: #9fb0bc;
+  --line: #24323d;
+  --brand: #45c98e;
+  --pill: rgba(45, 201, 142, 0.16);
+  --pillt: #5fd3a6;
+  --grad-soft: linear-gradient(120deg, rgba(44, 110, 156, 0.22), rgba(87, 201, 138, 0.18));
+}
+
+* {
+  border-color: var(--line);
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+  overflow: hidden;
+}
+
+.text-grad {
+  background: var(--grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.bg-grad {
+  background: var(--grad);
+}
+
+.bg-grad-soft {
+  background: var(--grad-soft);
+}
