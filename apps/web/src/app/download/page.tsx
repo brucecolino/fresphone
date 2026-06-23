@@ -22,7 +22,7 @@ export default function DownloadPage() {
         </p>
         <div className="mt-8 flex flex-col items-center gap-3">
           <Link
-            href="https://github.com/brucecolino/fresphone/releases"
+            href="https://github.com/brucecolino/freshphone/releases"
             className="bg-grad inline-flex items-center rounded-full px-7 py-3.5 text-sm font-semibold text-white transition-[filter] hover:brightness-110"
           >
             Scarica per Windows (.exe)
