@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { Logo } from './logo'
+import { NewsletterForm } from './newsletter-form'
 
 const cols: { title: string; links: { href: string; label: string }[] }[] = [
   {
@@ -32,6 +33,15 @@ const cols: { title: string; links: { href: string; label: string }[] }[] = [
 export function SiteFooter() {
   return (
     <footer className="border-t border-line bg-surface">
+      <div className="container-x border-b border-line py-10">
+        <div className="grid gap-6 md:grid-cols-2 md:items-center">
+          <div>
+            <h3 className="font-display text-lg font-semibold">Offerte e codici sconto</h3>
+            <p className="mt-1 text-sm text-ink2">Iscriviti per ricevere promo e novità. Niente spam, disiscrizione con un clic.</p>
+          </div>
+          <NewsletterForm />
+        </div>
+      </div>
       <div className="container-x grid gap-10 py-14 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
         <div>
           <Logo />
