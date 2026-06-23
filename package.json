@@ -1,0 +1,17 @@
+{
+  "name": "freshphone-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "FreshPhone — Smart iPhone File Manager for Windows (desktop app + website + licensing)",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "web:dev": "pnpm --filter @freshphone/web dev",
+    "web:build": "pnpm --filter @freshphone/web build",
+    "web:start": "pnpm --filter @freshphone/web start",
+    "desktop:dev": "pnpm --filter @freshphone/desktop dev",
+    "desktop:build": "pnpm --filter @freshphone/desktop build"
+  }
+}
