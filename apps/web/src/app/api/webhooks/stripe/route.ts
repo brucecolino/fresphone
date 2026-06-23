@@ -38,6 +38,7 @@ export async function POST(req: Request) {
             userId: s.metadata?.userId || null,
             amountCents: s.amount_total ?? 0,
             cartId: s.metadata?.cartId || null,
+            promoCodeId: s.metadata?.promoCodeId || null,
           })
         }
         break

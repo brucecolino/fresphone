@@ -36,3 +36,38 @@ export async function setPromoBanner(value: PromoBanner): Promise<void> {
     create: { key: 'promoBanner', value: json },
   })
 }
+
+// ===== Offerta di recupero carrello (banner all'uscita dal checkout) =====
+
+export interface RecoveryPromo {
+  enabled: boolean
+  code: string
+  text: string
+}
+
+const DEFAULT_RECOVERY: RecoveryPromo = { enabled: false, code: '', text: '' }
+
+async function readRecovery(): Promise<RecoveryPromo> {
+  if (!process.env.DATABASE_URL) return DEFAULT_RECOVERY
+  try {
+    const row = await prisma.siteSetting.findUnique({ where: { key: 'recoveryPromo' } })
+    if (!row) return DEFAULT_RECOVERY
+    return { ...DEFAULT_RECOVERY, ...(row.value as unknown as Partial<RecoveryPromo>) }
+  } catch {
+    return DEFAULT_RECOVERY
+  }
+}
+
+export const getRecoveryPromo = unstable_cache(readRecovery, ['recovery-promo'], {
+  tags: ['site-settings'],
+  revalidate: 60,
+})
+
+export async function setRecoveryPromo(value: RecoveryPromo): Promise<void> {
+  const json = value as unknown as Prisma.InputJsonValue
+  await prisma.siteSetting.upsert({
+    where: { key: 'recoveryPromo' },
+    update: { value: json },
+    create: { key: 'recoveryPromo', value: json },
+  })
+}

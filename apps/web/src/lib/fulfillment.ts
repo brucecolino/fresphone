@@ -15,6 +15,7 @@ export async function fulfillOrder(params: {
   userId?: string | null
   amountCents: number
   cartId?: string | null
+  promoCodeId?: string | null
 }) {
   const order = await prisma.order.upsert({
     where: { providerCheckoutId: params.providerCheckoutId },
@@ -31,6 +32,7 @@ export async function fulfillOrder(params: {
       providerSubscriptionId: params.providerSubscriptionId ?? undefined,
       amountCents: params.amountCents,
       status: 'PAID',
+      promoCodeId: params.promoCodeId ?? undefined,
     },
   })
 
@@ -42,6 +44,14 @@ export async function fulfillOrder(params: {
       subject: 'La tua licenza FreshPhone',
       html: licenseEmailHtml({ key: license.key, planName: PLANS[params.plan].name }),
     })
+    if (params.promoCodeId) {
+      await prisma.promoCode
+        .update({ where: { id: params.promoCodeId }, data: { redeemedCount: { increment: 1 } } })
+        .catch(() => undefined)
+      await prisma.promoRedemption
+        .create({ data: { promoCodeId: params.promoCodeId, email: params.email, orderId: order.id } })
+        .catch(() => undefined)
+    }
   }
 
   if (params.cartId) {

@@ -21,7 +21,7 @@ export async function GET(req: Request) {
     const pu = data.purchase_units?.[0]
     const cap = pu?.payments?.captures?.[0]
     const custom = pu?.custom_id ?? cap?.custom_id ?? ''
-    const [plan, cartId, userId] = custom.split('|')
+    const [plan, cartId, userId, promoId] = custom.split('|')
     const email = data.payer?.email_address ?? ''
     const amountCents = Math.round(parseFloat(cap?.amount?.value ?? '0') * 100)
 
@@ -34,6 +34,7 @@ export async function GET(req: Request) {
         userId: userId || null,
         amountCents,
         cartId: cartId || null,
+        promoCodeId: promoId || null,
       })
     }
     return Response.redirect(`${site}/account?purchase=success`, 303)
