@@ -34,18 +34,19 @@ class DeviceAgent {
   private buf = ''
   private seq = 0
   private pending = new Map<number, Pending>()
-  private unavailable = false
+  private failedAt = 0
 
   private ensure(): boolean {
     if (this.proc && this.proc.exitCode === null && !this.proc.killed) return true
-    if (this.unavailable) return false
+    if (Date.now() - this.failedAt < 2000) return false // breve cooldown, poi riprova (auto-ripristino)
     const c = agentCommand()
     if (!c) {
-      this.unavailable = true
+      this.failedAt = Date.now()
       return false
     }
     try {
-      const p = spawn(c.cmd, c.args, { windowsHide: true }) as ChildProcessWithoutNullStreams
+      // passa il PID di Electron all'agent, così si auto-termina se l'app muore
+      const p = spawn(c.cmd, [...c.args, String(process.pid)], { windowsHide: true }) as ChildProcessWithoutNullStreams
       p.stdout.setEncoding('utf8')
       p.stdout.on('data', (d: string) => this.onData(d))
       p.stderr.on('data', () => {
@@ -54,13 +55,13 @@ class DeviceAgent {
       p.on('exit', () => this.cleanup())
       p.on('error', () => {
         this.cleanup()
-        this.unavailable = true // comando non trovato (es. Python assente)
+        this.failedAt = Date.now()
       })
       this.proc = p
       return true
     } catch {
       this.proc = null
-      this.unavailable = true
+      this.failedAt = Date.now()
       return false
     }
   }

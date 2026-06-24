@@ -9,7 +9,7 @@ Protocollo:
   richiesta:  {"id": <n>, "cmd": "status|list|pair|pull|rm|ping", ...}
   risposta:   {"id": <n>, "ok": true, "result": <...>}  |  {"id": <n>, "ok": false, "error": "..."}
 """
-import sys, os, json, asyncio, io, base64
+import sys, os, json, asyncio, io, base64, ctypes
 
 # Decoder HEIC/HEIF (le foto iPhone sono quasi tutte HEIC; ffmpeg non le apre).
 try:
@@ -17,6 +17,38 @@ try:
     pillow_heif.register_heif_opener()
 except Exception:
     pass
+
+# PID del processo padre (Electron): se muore, l'agent si auto-termina (niente orfani).
+try:
+    PARENT_PID = int(sys.argv[1]) if len(sys.argv) > 1 else None
+except Exception:
+    PARENT_PID = None
+
+
+def _parent_alive():
+    if PARENT_PID is None:
+        return True
+    if sys.platform == 'win32':
+        k = ctypes.windll.kernel32
+        h = k.OpenProcess(0x1000, False, PARENT_PID)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not h:
+            return False
+        code = ctypes.c_ulong()
+        k.GetExitCodeProcess(h, ctypes.byref(code))
+        k.CloseHandle(h)
+        return code.value == 259  # STILL_ACTIVE
+    try:
+        os.kill(PARENT_PID, 0)
+        return True
+    except Exception:
+        return False
+
+
+async def _watch_parent():
+    while True:
+        await asyncio.sleep(3)
+        if not _parent_alive():
+            os._exit(0)
 
 
 async def aw(x):
@@ -227,6 +259,7 @@ async def dispatch(agent, req):
 async def main():
     agent = Agent()
     loop = asyncio.get_running_loop()
+    asyncio.create_task(_watch_parent())
     while True:
         line = await loop.run_in_executor(None, sys.stdin.readline)
         if line == '':
