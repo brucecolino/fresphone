@@ -89,9 +89,13 @@ export function Photos() {
   const [dir, setDir] = useState<'asc' | 'desc'>('desc')
   const [filter, setFilter] = useState<Filter>('all')
   const [sel, setSel] = useState<Set<string>>(new Set())
+  const [caps, setCaps] = useState<{ afc: boolean; ffmpeg: boolean } | null>(null)
+  const [mode, setMode] = useState<string | undefined>()
 
   useEffect(() => {
     window.fp.device.list('photos').then((x) => setItems(x as MediaItem[]))
+    window.fp.device.status().then((s) => setMode((s as { mode?: string }).mode))
+    window.fp.media.capabilities().then((c) => setCaps(c as { afc: boolean; ffmpeg: boolean }))
   }, [])
 
   const view = useMemo(() => {
@@ -139,6 +143,12 @@ export function Photos() {
             {dir === 'asc' ? 'Crescente' : 'Decrescente'}
           </button>
         </div>
+        {mode === 'device' && caps && (!caps.afc || !caps.ffmpeg) && (
+          <p className="mt-2 text-xs text-ink2">
+            {!caps.afc && 'Per leggere i contenuti installa pymobiledevice3 in resources/bin. '}
+            {!caps.ffmpeg && 'Per le anteprime HEIC/video installa ffmpeg in resources/bin.'}
+          </p>
+        )}
         <div className="mt-3 flex items-center gap-2">
           {chips.map((c) => (
             <button

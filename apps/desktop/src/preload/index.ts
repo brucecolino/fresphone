@@ -28,6 +28,7 @@ const api = {
   },
   media: {
     thumb: (source: string, id: string): Promise<string | null> => ipcRenderer.invoke('media:thumb', source, id),
+    capabilities: (): Promise<{ afc: boolean; ffmpeg: boolean }> => ipcRenderer.invoke('media:capabilities'),
   },
   driver: {
     install: (): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke('driver:install'),

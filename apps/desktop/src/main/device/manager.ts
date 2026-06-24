@@ -2,6 +2,8 @@ import { readSettings } from '../settings'
 import { mockEngine } from './mock'
 import { probe, afcList, pairDevice } from './libimobiledevice'
 import { getThumb } from '../media/thumbs'
+import { run } from './runner'
+import { toolPath } from './tools'
 import type { MediaItem, SourceKey } from './engine'
 
 export interface DeviceState {
@@ -61,4 +63,11 @@ export async function thumb(source: SourceKey, id: string): Promise<string | nul
   const p = await probe()
   if (!p.connected || !p.trusted || !p.udid) return null
   return getThumb(p.udid, source, id)
+}
+
+// Presenza degli strumenti opzionali (per spiegare anteprime mancanti).
+export async function capabilities(): Promise<{ afc: boolean; ffmpeg: boolean }> {
+  const afc = (await run(toolPath('pymobiledevice3'), ['version'])).code !== 127
+  const ffmpeg = (await run(toolPath('ffmpeg'), ['-version'])).code !== 127
+  return { afc, ffmpeg }
 }
