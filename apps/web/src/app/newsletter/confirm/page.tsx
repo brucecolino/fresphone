@@ -9,10 +9,14 @@ export default async function NewsletterConfirmPage({ searchParams }: { searchPa
   if (token) {
     const sub = await prisma.newsletterSubscriber.findUnique({ where: { confirmToken: token } }).catch(() => null)
     if (sub) {
-      await prisma.newsletterSubscriber.update({
-        where: { id: sub.id },
-        data: { status: 'CONFIRMED', consentAt: new Date(), confirmToken: null },
-      })
+      // Idempotente: non azzeriamo il token, così il link funziona anche se
+      // pre-aperto dai filtri antispam o cliccato più volte.
+      if (sub.status !== 'CONFIRMED') {
+        await prisma.newsletterSubscriber.update({
+          where: { id: sub.id },
+          data: { status: 'CONFIRMED', consentAt: new Date() },
+        })
+      }
       ok = true
     }
   }
