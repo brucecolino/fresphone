@@ -33,6 +33,13 @@ const api = {
   driver: {
     install: (): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke('driver:install'),
   },
+  transfer: {
+    export: (
+      source: string,
+      ids: string[],
+    ): Promise<{ ok: boolean; copied?: number; total?: number; dir?: string; demo?: boolean; message?: string }> =>
+      ipcRenderer.invoke('transfer:export', source, ids),
+  },
 }
 
 if (process.contextIsolated) {

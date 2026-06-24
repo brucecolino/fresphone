@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { readSettings, writeSettings, type ThemeSource } from './settings'
 import { getState, listItems, pair, thumb, capabilities } from './device/manager'
 import { installAppleDrivers } from './drivers/onboarding'
+import { exportSelection } from './transfer/export'
 import type { SourceKey } from './device/engine'
 
 let win: BrowserWindow | null = null
@@ -65,6 +66,7 @@ app.whenReady().then(() => {
   ipcMain.handle('device:pair', () => pair())
   ipcMain.handle('media:thumb', (_e, source: SourceKey, id: string) => thumb(source, id))
   ipcMain.handle('media:capabilities', () => capabilities())
+  ipcMain.handle('transfer:export', (_e, source: SourceKey, ids: string[]) => exportSelection(source, ids))
   ipcMain.handle('driver:install', () => installAppleDrivers())
 
   nativeTheme.on('updated', () => {

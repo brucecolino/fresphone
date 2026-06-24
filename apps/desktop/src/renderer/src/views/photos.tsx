@@ -91,6 +91,8 @@ export function Photos() {
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [caps, setCaps] = useState<{ afc: boolean; ffmpeg: boolean } | null>(null)
   const [mode, setMode] = useState<string | undefined>()
+  const [exporting, setExporting] = useState(false)
+  const [exportMsg, setExportMsg] = useState<string | null>(null)
 
   useEffect(() => {
     window.fp.device.list('photos').then((x) => setItems(x as MediaItem[]))
@@ -118,6 +120,17 @@ export function Photos() {
       else n.add(id)
       return n
     })
+  }
+
+  async function doExport() {
+    setExporting(true)
+    setExportMsg(null)
+    try {
+      const r = await window.fp.transfer.export('photos', Array.from(sel))
+      setExportMsg(r.ok ? `Esportati ${r.copied}/${r.total} in ${r.dir}` : r.message ?? 'Errore')
+    } finally {
+      setExporting(false)
+    }
   }
 
   return (
@@ -164,13 +177,16 @@ export function Photos() {
           ))}
           {sel.size > 0 && (
             <div className="ml-auto flex gap-2">
-              <button className="bg-grad rounded-full px-4 py-1.5 text-xs font-semibold text-white">Esporta selezione</button>
+              <button onClick={doExport} disabled={exporting} className="bg-grad rounded-full px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-60">
+                {exporting ? 'Esporto…' : 'Esporta selezione'}
+              </button>
               <button onClick={() => setSel(new Set())} className="rounded-full border border-line px-3 py-1.5 text-xs">
                 Deseleziona
               </button>
             </div>
           )}
         </div>
+        {exportMsg && <p className="mt-2 text-xs text-ink2">{exportMsg}</p>}
       </div>
 
       <div className="flex-1 overflow-auto p-4">
