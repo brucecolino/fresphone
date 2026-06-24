@@ -31,6 +31,8 @@ const api = {
       ipcRenderer.invoke('media:thumb', source, id, size),
     open: (source: string, id: string): Promise<{ ok: boolean; message?: string }> =>
       ipcRenderer.invoke('media:open', source, id),
+    localFile: (source: string, id: string): Promise<{ ok: boolean; url?: string; message?: string }> =>
+      ipcRenderer.invoke('media:localFile', source, id),
     capabilities: (): Promise<{ afc: boolean; ffmpeg: boolean }> => ipcRenderer.invoke('media:capabilities'),
   },
   driver: {

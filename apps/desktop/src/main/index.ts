@@ -1,5 +1,6 @@
-import { app, BrowserWindow, nativeTheme, nativeImage, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, nativeTheme, nativeImage, ipcMain, shell, protocol, net } from 'electron'
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { readSettings, writeSettings, type ThemeSource } from './settings'
 import { getState, listItems, pair, thumb, capabilities } from './device/manager'
 import { agent } from './device/agent'
@@ -9,8 +10,14 @@ import { exportSelection } from './transfer/export'
 import { removeSelection } from './transfer/remove'
 import { moveSelection } from './transfer/move'
 import { openItem } from './media/open'
+import { viewerDir, localMediaUrl } from './media/viewer'
 import { getLicenseStatus, activate, deactivate } from './license'
 import type { SourceKey } from './device/engine'
+
+// Protocollo per servire i file locali al visualizzatore interno (foto HEIC, video).
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'fpmedia', privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true } },
+])
 
 let win: BrowserWindow | null = null
 
@@ -85,6 +92,16 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  protocol.handle('fpmedia', (req) => {
+    try {
+      const u = new URL(req.url)
+      const name = decodeURIComponent(u.pathname.replace(/^\/+/, ''))
+      if (!name || name.includes('..') || /[\\/]/.test(name)) return new Response('bad request', { status: 400 })
+      return net.fetch(pathToFileURL(join(viewerDir(), name)).toString())
+    } catch {
+      return new Response('error', { status: 500 })
+    }
+  })
   ipcMain.handle('theme:get', () => ({ source: nativeTheme.themeSource, resolved: resolvedTheme() }))
   ipcMain.handle('theme:set', (_e, source: ThemeSource) => {
     nativeTheme.themeSource = source
@@ -104,6 +121,7 @@ app.whenReady().then(() => {
   ipcMain.handle('device:pair', () => pair())
   ipcMain.handle('media:thumb', (_e, source: SourceKey, id: string, size?: number) => thumb(source, id, size))
   ipcMain.handle('media:open', (_e, source: SourceKey, id: string) => openItem(source, id))
+  ipcMain.handle('media:localFile', (_e, source: SourceKey, id: string) => localMediaUrl(source, id))
   ipcMain.handle('media:capabilities', () => capabilities())
   ipcMain.handle('transfer:export', (_e, source: SourceKey, ids: string[]) => exportSelection(source, ids))
   ipcMain.handle('transfer:remove', (_e, source: SourceKey, ids: string[]) => removeSelection(source, ids))

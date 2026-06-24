@@ -1,5 +1,5 @@
-import { forwardRef, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { VirtuosoGrid } from 'react-virtuoso'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Virtuoso } from 'react-virtuoso'
 import { cn } from '../lib/cn'
 import { useDevice } from '../store/device'
 import type { MediaItem } from '../types'
@@ -32,6 +32,13 @@ const fmtDate = (s: string) => {
   const d = new Date(s)
   return isNaN(d.getTime()) ? '—' : d.toLocaleString('it-IT', { dateStyle: 'medium', timeStyle: 'short' })
 }
+function monthInfo(iso: string): { key: string; label: string } {
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return { key: 'zzz', label: 'Senza data' }
+  const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  const raw = d.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })
+  return { key, label: raw.charAt(0).toUpperCase() + raw.slice(1) }
+}
 
 const SORTS: { v: string; label: string }[] = [
   { v: 'date_desc', label: 'Data (più recenti)' },
@@ -50,28 +57,6 @@ const chips: { k: Filter; label: string }[] = [
   { k: 'video', label: 'Video' },
 ]
 
-const GridList = forwardRef<HTMLDivElement, { style?: CSSProperties; children?: ReactNode }>(function GridList(
-  { style, children, ...props },
-  ref,
-) {
-  return (
-    <div
-      ref={ref}
-      {...props}
-      style={{
-        ...style,
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(var(--cell, 150px), 1fr))',
-        gap: 8,
-        padding: 12,
-      }}
-    >
-      {children}
-    </div>
-  )
-})
-const GridItem = ({ children, ...props }: { children?: ReactNode }) => <div {...props}>{children}</div>
-
 function Tile({
   item,
   selected,
@@ -88,7 +73,6 @@ function Tile({
   onDragStart: () => void
 }) {
   const [src, setSrc] = useState<string | null>(() => thumbCache.get(item.id) ?? null)
-
   useEffect(() => {
     if (src) return
     let alive = true
@@ -116,64 +100,119 @@ function Tile({
         selected && 'ring-2 ring-brand ring-offset-2 ring-offset-bg',
       )}
     >
-      {src ? <img src={src} alt="" loading="lazy" className="h-full w-full object-cover" /> : <span className="block h-full w-full animate-pulse bg-line/50" />}
+      {src ? (
+        <img src={src} alt="" loading="lazy" className="h-full w-full object-cover" />
+      ) : (
+        <span className="block h-full w-full animate-pulse bg-line/50" />
+      )}
       {item.type === 'video' && (
         <span className="absolute bottom-1 right-1 rounded bg-black/55 px-1 text-[10px] font-medium text-white">video</span>
       )}
-      {selected && (
-        <span className="absolute left-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-brand text-[10px] font-bold text-white">
-          ✓
-        </span>
-      )}
+      {selected && <span className="absolute left-1 top-1 h-3.5 w-3.5 rounded-full border-2 border-white bg-brand" />}
     </button>
   )
 }
 
-function PropertiesModal({ item, onClose }: { item: MediaItem; onClose: () => void }) {
-  const [src, setSrc] = useState<string | null>(null)
+function Viewer({
+  items,
+  index,
+  onIndex,
+  onClose,
+}: {
+  items: MediaItem[]
+  index: number
+  onIndex: (i: number) => void
+  onClose: () => void
+}) {
+  const item = items[index]
+  const isVideo = item?.type === 'video'
+  const [img, setImg] = useState<string | null>(null)
+  const [video, setVideo] = useState<string | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+
   useEffect(() => {
+    if (!item) return
     let alive = true
-    window.fp.media.thumb('photos', item.id, 1024).then((s) => {
-      if (alive) setSrc(s as string | null)
-    })
+    setImg(null)
+    setVideo(null)
+    setErr(null)
+    if (isVideo) {
+      window.fp.media.localFile('photos', item.id).then((r) => {
+        if (!alive) return
+        if (r.ok && r.url) setVideo(r.url)
+        else setErr(r.message ?? 'Impossibile caricare il video')
+      })
+    } else {
+      window.fp.media.thumb('photos', item.id, 1600).then((s) => {
+        if (!alive) return
+        if (s) setImg(s as string)
+        else setErr('Impossibile caricare l’immagine')
+      })
+    }
     return () => {
       alive = false
     }
-  }, [item.id])
+  }, [item, isVideo])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+      else if (e.key === 'ArrowRight') onIndex(Math.min(items.length - 1, index + 1))
+      else if (e.key === 'ArrowLeft') onIndex(Math.max(0, index - 1))
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [index, items.length, onClose, onIndex])
+
+  if (!item) return null
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={onClose}>
-      <div className="max-h-full w-full max-w-3xl overflow-auto rounded-xl2 border border-line bg-surface p-5" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-start justify-between gap-4">
-          <h2 className="font-display text-lg font-semibold">{item.name}</h2>
-          <button onClick={onClose} className="rounded-lg border border-line px-3 py-1 text-sm hover:bg-bg">
-            Chiudi
+    <div className="fixed inset-0 z-50 flex flex-col bg-black/90" onClick={onClose}>
+      <div className="flex items-center justify-between gap-3 px-4 py-2 text-white" onClick={(e) => e.stopPropagation()}>
+        <span className="truncate text-sm">
+          {item.name} · {fmtDate(item.date)} · {index + 1}/{items.length}
+        </span>
+        <div className="flex items-center gap-2">
+          <button onClick={() => window.fp.media.open('photos', item.id)} className="rounded border border-white/30 px-3 py-1 text-xs hover:bg-white/10">
+            Apri in Windows
+          </button>
+          <button onClick={onClose} className="rounded border border-white/30 px-3 py-1 text-xs hover:bg-white/10">
+            Chiudi (Esc)
           </button>
         </div>
-        <div className="mt-4 flex min-h-[200px] items-center justify-center rounded-lg bg-bg p-2">
-          {src ? <img src={src} alt="" className="max-h-[60vh] w-auto rounded" /> : <span className="text-sm text-ink2">Anteprima in caricamento…</span>}
-        </div>
-        <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
-          <dt className="text-ink2">Tipo</dt>
-          <dd>{item.type === 'video' ? 'Video' : 'Foto'} · {item.kind}</dd>
-          <dt className="text-ink2">Dimensione</dt>
-          <dd>{fmtSize(item.sizeBytes)}</dd>
-          <dt className="text-ink2">Data</dt>
-          <dd>{fmtDate(item.date)}</dd>
-          <dt className="text-ink2">Nome file</dt>
-          <dd className="truncate">{item.name}</dd>
-        </dl>
-        <div className="mt-4">
-          <button
-            onClick={() => window.fp.media.open('photos', item.id)}
-            className="bg-grad rounded-full px-5 py-2 text-sm font-semibold text-white"
-          >
-            Apri nel visualizzatore di Windows
-          </button>
-        </div>
+      </div>
+      <div className="relative flex flex-1 items-center justify-center overflow-hidden p-4" onClick={(e) => e.stopPropagation()}>
+        <button
+          onClick={() => onIndex(Math.max(0, index - 1))}
+          disabled={index === 0}
+          className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/10 px-3 py-3 text-lg text-white hover:bg-white/20 disabled:opacity-30"
+        >
+          ‹
+        </button>
+        {isVideo ? (
+          video ? (
+            <video src={video} controls autoPlay className="max-h-full max-w-full" />
+          ) : (
+            <span className="text-sm text-white/70">{err ?? 'Caricamento video…'}</span>
+          )
+        ) : img ? (
+          <img src={img} alt="" className="max-h-full max-w-full object-contain" />
+        ) : (
+          <span className="text-sm text-white/70">{err ?? 'Caricamento…'}</span>
+        )}
+        <button
+          onClick={() => onIndex(Math.min(items.length - 1, index + 1))}
+          disabled={index === items.length - 1}
+          className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/10 px-3 py-3 text-lg text-white hover:bg-white/20 disabled:opacity-30"
+        >
+          ›
+        </button>
       </div>
     </div>
   )
 }
+
+type IndexedItem = { item: MediaItem; index: number }
+type Row = { type: 'header'; key: string; label: string } | { type: 'tiles'; key: string; cells: IndexedItem[] }
 
 export function Photos() {
   const status = useDevice((s) => s.status)
@@ -183,14 +222,18 @@ export function Photos() {
   const [loading, setLoading] = useState(false)
   const [sort, setSort] = useState('date_desc')
   const [filter, setFilter] = useState<Filter>('all')
+  const [byMonth, setByMonth] = useState(false)
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [lastIndex, setLastIndex] = useState<number | null>(null)
   const [zoom, setZoom] = useState(1)
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
-  const [props, setProps] = useState<MediaItem | null>(null)
+  const [propsItem, setPropsItem] = useState<MediaItem | null>(null)
+  const [viewerIdx, setViewerIdx] = useState<number | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
+  const gridRef = useRef<HTMLDivElement>(null)
+  const [width, setWidth] = useState(0)
 
   const loadItems = useCallback(() => {
     if (!ready) {
@@ -203,12 +246,23 @@ export function Photos() {
       .then((x) => setItems(x as MediaItem[]))
       .finally(() => setLoading(false))
   }, [ready])
-
   useEffect(() => {
     loadItems()
   }, [loadItems])
 
-  // Ctrl + rotellina = ridimensiona anteprime (e blocca lo zoom della pagina).
+  // larghezza della griglia -> numero di colonne
+  useEffect(() => {
+    const el = gridRef.current
+    if (!el) return
+    const ro = new ResizeObserver((entries) => {
+      for (const e of entries) setWidth(e.contentRect.width)
+    })
+    ro.observe(el)
+    setWidth(el.clientWidth)
+    return () => ro.disconnect()
+  }, [])
+
+  // Ctrl + rotellina = ridimensiona anteprime (blocca lo zoom della pagina)
   useEffect(() => {
     const el = wrapRef.current
     if (!el) return
@@ -220,6 +274,8 @@ export function Photos() {
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
   }, [])
+
+  const columns = Math.max(1, Math.min(16, Math.floor((width - 24 + 8) / (CELL[zoom] + 8))))
 
   const view = useMemo(() => {
     const filtered = items.filter((it) => (filter === 'all' ? true : filter === 'video' ? it.type === 'video' : it.type === 'photo'))
@@ -233,6 +289,37 @@ export function Photos() {
     })
     return sorted
   }, [items, filter, sort])
+
+  const rows = useMemo<Row[]>(() => {
+    const indexed: IndexedItem[] = view.map((item, index) => ({ item, index }))
+    const chunk = (arr: IndexedItem[], prefix: string): Row[] => {
+      const out: Row[] = []
+      for (let i = 0; i < arr.length; i += columns) out.push({ type: 'tiles', key: `${prefix}-${i}`, cells: arr.slice(i, i + columns) })
+      return out
+    }
+    if (!byMonth) return chunk(indexed, 'r')
+    const out: Row[] = []
+    let bucket: IndexedItem[] = []
+    let curKey = ''
+    let curLabel = ''
+    const flush = () => {
+      if (!bucket.length) return
+      out.push({ type: 'header', key: `h-${curKey}`, label: curLabel })
+      out.push(...chunk(bucket, `t-${curKey}`))
+      bucket = []
+    }
+    for (const it of indexed) {
+      const m = monthInfo(it.item.date)
+      if (m.key !== curKey) {
+        flush()
+        curKey = m.key
+        curLabel = m.label
+      }
+      bucket.push(it)
+    }
+    flush()
+    return out
+  }, [view, columns, byMonth])
 
   function clickTile(e: React.MouseEvent, index: number, id: string) {
     if (e.shiftKey && lastIndex != null) {
@@ -249,7 +336,6 @@ export function Photos() {
       setLastIndex(index)
     }
   }
-
   function contextTile(e: React.MouseEvent, index: number, id: string) {
     e.preventDefault()
     if (!sel.has(id)) {
@@ -260,12 +346,8 @@ export function Photos() {
   }
 
   const selIds = () => Array.from(sel)
-  function selectAll() {
-    setSel(new Set(view.map((it) => it.id)))
-  }
-  function clearSel() {
-    setSel(new Set())
-  }
+  const selectAll = () => setSel(new Set(view.map((it) => it.id)))
+  const clearSel = () => setSel(new Set())
 
   async function doExport(ids: string[]) {
     setBusy(true)
@@ -305,21 +387,18 @@ export function Photos() {
       setBusy(false)
     }
   }
-  async function doOpen(id: string) {
-    const r = await window.fp.media.open('photos', id)
-    if (!r.ok) setMsg(r.message ?? 'Impossibile aprire il file')
-  }
 
   const menuItems = (() => {
     const ids = selIds()
     const one = ids.length === 1 ? ids[0] : null
+    const oneIdx = one ? view.findIndex((it) => it.id === one) : -1
     return [
-      { label: 'Apri', disabled: !one, run: () => one && doOpen(one) },
-      { label: 'Proprietà', disabled: !one, run: () => one && setProps(view.find((it) => it.id === one) ?? null) },
+      { label: 'Apri', disabled: oneIdx < 0, run: () => oneIdx >= 0 && setViewerIdx(oneIdx) },
+      { label: 'Proprietà', disabled: !one, run: () => one && setPropsItem(view.find((it) => it.id === one) ?? null) },
       { sep: true },
       { label: `Esporta in cartella… (${ids.length})`, run: () => doExport(ids) },
       { label: `Sposta nel PC… (${ids.length})`, run: () => doMove(ids) },
-      { sep: true, danger: true },
+      { sep: true },
       { label: `Elimina dall'iPhone (${ids.length})`, danger: true, run: () => doRemove(ids) },
     ] as { label?: string; sep?: boolean; danger?: boolean; disabled?: boolean; run?: () => void }[]
   })()
@@ -335,6 +414,10 @@ export function Photos() {
               {sel.size > 0 ? ` · ${sel.size} selezionati` : ''}
             </p>
           </div>
+          <label className="flex items-center gap-2 text-xs text-ink2">
+            <input type="checkbox" checked={byMonth} onChange={(e) => setByMonth(e.target.checked)} />
+            Dividi per mese
+          </label>
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value)}
@@ -347,10 +430,10 @@ export function Photos() {
             ))}
           </select>
           <div className="flex items-center gap-1 rounded-lg border border-line p-0.5">
-            <button onClick={() => setZoom((z) => Math.max(0, z - 1))} className="rounded px-2 py-1 text-sm hover:bg-bg" title="Anteprime più piccole">
+            <button onClick={() => setZoom((z) => Math.max(0, z - 1))} className="rounded px-2 py-1 text-sm hover:bg-bg" title="Più piccole">
               −
             </button>
-            <button onClick={() => setZoom((z) => Math.min(CELL.length - 1, z + 1))} className="rounded px-2 py-1 text-sm hover:bg-bg" title="Anteprime più grandi (anche Ctrl+rotellina)">
+            <button onClick={() => setZoom((z) => Math.min(CELL.length - 1, z + 1))} className="rounded px-2 py-1 text-sm hover:bg-bg" title="Più grandi (anche Ctrl+rotellina)">
               +
             </button>
           </div>
@@ -395,25 +478,33 @@ export function Photos() {
         {msg && <p className="mt-2 text-xs text-ink2">{msg}</p>}
       </div>
 
-      <div className="min-h-0 flex-1" style={{ ['--cell' as string]: `${CELL[zoom]}px` }}>
+      <div ref={gridRef} className="min-h-0 flex-1">
         {!ready ? (
           <p className="p-6 text-sm text-ink2">Collega e autorizza l’iPhone per vedere foto e video.</p>
         ) : view.length === 0 && !loading ? (
           <p className="p-6 text-sm text-ink2">Nessun elemento.</p>
         ) : (
-          <VirtuosoGrid
-            data={view}
-            components={{ List: GridList, Item: GridItem }}
-            itemContent={(index, item) => (
-              <Tile
-                item={item}
-                selected={sel.has(item.id)}
-                onClick={(e) => clickTile(e, index, item.id)}
-                onContextMenu={(e) => contextTile(e, index, item.id)}
-                onDoubleClick={() => doOpen(item.id)}
-                onDragStart={() => window.fp.transfer.startDrag('photos', sel.has(item.id) ? selIds() : [item.id])}
-              />
-            )}
+          <Virtuoso
+            data={rows}
+            itemContent={(_, row) =>
+              row.type === 'header' ? (
+                <div className="px-3 pb-1 pt-4 text-sm font-semibold text-ink">{row.label}</div>
+              ) : (
+                <div className="grid gap-2 px-3 py-1" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0,1fr))` }}>
+                  {row.cells.map(({ item, index }) => (
+                    <Tile
+                      key={item.id}
+                      item={item}
+                      selected={sel.has(item.id)}
+                      onClick={(e) => clickTile(e, index, item.id)}
+                      onContextMenu={(e) => contextTile(e, index, item.id)}
+                      onDoubleClick={() => setViewerIdx(index)}
+                      onDragStart={() => window.fp.transfer.startDrag('photos', sel.has(item.id) ? selIds() : [item.id])}
+                    />
+                  ))}
+                </div>
+              )
+            }
             style={{ height: '100%' }}
           />
         )}
@@ -423,8 +514,8 @@ export function Photos() {
         <>
           <div className="fixed inset-0 z-40" onClick={() => setMenu(null)} onContextMenu={(e) => { e.preventDefault(); setMenu(null) }} />
           <div
-            className="fixed z-50 min-w-48 overflow-hidden rounded-lg border border-line bg-surface py-1 shadow-lg"
-            style={{ left: Math.min(menu.x, window.innerWidth - 220), top: Math.min(menu.y, window.innerHeight - 240) }}
+            className="fixed z-50 min-w-52 overflow-hidden rounded-lg border border-line bg-surface py-1 shadow-lg"
+            style={{ left: Math.min(menu.x, window.innerWidth - 230), top: Math.min(menu.y, window.innerHeight - 250) }}
           >
             {menuItems.map((m, i) =>
               m.sep ? (
@@ -437,10 +528,7 @@ export function Photos() {
                     setMenu(null)
                     m.run?.()
                   }}
-                  className={cn(
-                    'block w-full px-3 py-1.5 text-left text-sm hover:bg-bg disabled:opacity-40',
-                    m.danger && 'text-red-500',
-                  )}
+                  className={cn('block w-full px-3 py-1.5 text-left text-sm hover:bg-bg disabled:opacity-40', m.danger && 'text-red-500')}
                 >
                   {m.label}
                 </button>
@@ -450,7 +538,55 @@ export function Photos() {
         </>
       )}
 
-      {props && <PropertiesModal item={props} onClose={() => setProps(null)} />}
+      {propsItem && <PropertiesModal item={propsItem} onOpen={() => window.fp.media.open('photos', propsItem.id)} onClose={() => setPropsItem(null)} />}
+      {viewerIdx != null && view[viewerIdx] && (
+        <Viewer items={view} index={viewerIdx} onIndex={setViewerIdx} onClose={() => setViewerIdx(null)} />
+      )}
+    </div>
+  )
+}
+
+function PropertiesModal({ item, onOpen, onClose }: { item: MediaItem; onOpen: () => void; onClose: () => void }) {
+  const [src, setSrc] = useState<string | null>(null)
+  useEffect(() => {
+    let alive = true
+    window.fp.media.thumb('photos', item.id, 1024).then((s) => {
+      if (alive) setSrc(s as string | null)
+    })
+    return () => {
+      alive = false
+    }
+  }, [item.id])
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={onClose}>
+      <div className="max-h-full w-full max-w-3xl overflow-auto rounded-xl2 border border-line bg-surface p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-4">
+          <h2 className="font-display text-lg font-semibold">{item.name}</h2>
+          <button onClick={onClose} className="rounded-lg border border-line px-3 py-1 text-sm hover:bg-bg">
+            Chiudi
+          </button>
+        </div>
+        <div className="mt-4 flex min-h-[200px] items-center justify-center rounded-lg bg-bg p-2">
+          {src ? <img src={src} alt="" className="max-h-[60vh] w-auto rounded" /> : <span className="text-sm text-ink2">Anteprima in caricamento…</span>}
+        </div>
+        <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+          <dt className="text-ink2">Tipo</dt>
+          <dd>
+            {item.type === 'video' ? 'Video' : 'Foto'} · {item.kind}
+          </dd>
+          <dt className="text-ink2">Dimensione</dt>
+          <dd>{fmtSize(item.sizeBytes)}</dd>
+          <dt className="text-ink2">Data</dt>
+          <dd>{fmtDate(item.date)}</dd>
+          <dt className="text-ink2">Nome file</dt>
+          <dd className="truncate">{item.name}</dd>
+        </dl>
+        <div className="mt-4">
+          <button onClick={onOpen} className="bg-grad rounded-full px-5 py-2 text-sm font-semibold text-white">
+            Apri in Windows
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
