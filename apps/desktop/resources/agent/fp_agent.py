@@ -199,6 +199,36 @@ class Agent:
                 })
         return items
 
+    async def browse(self, path):
+        # Elenca le voci (cartelle + file) sotto un percorso della media partition.
+        afc = await self.afc()
+        p = path if path.startswith('/') else '/' + path
+        if not p.endswith('/'):
+            p += '/'
+        items = []
+        try:
+            names = await aw(afc.listdir(p))
+        except Exception:
+            names = []
+        for n in names:
+            if n in ('.', '..'):
+                continue
+            size, date, is_dir = 0, '', False
+            try:
+                st = await aw(afc.stat(p + n))
+                is_dir = st.get('st_ifmt') == 'S_IFDIR'
+                size = st.get('st_size', 0)
+                date = self._date(st)
+            except Exception:
+                pass
+            rel = (p + n).lstrip('/')
+            items.append({
+                'id': rel, 'name': n, 'type': 'folder' if is_dir else ftype(n), 'isDir': is_dir,
+                'sizeBytes': size, 'date': date,
+                'kind': 'cartella' if is_dir else (n.rsplit('.', 1)[-1].upper() if '.' in n else ''),
+            })
+        return items
+
     async def pull(self, remote, dest):
         afc = await self.afc()
         data = await aw(afc.get_file_contents(remote))
@@ -243,6 +273,8 @@ async def dispatch(agent, req):
         return await agent.status()
     if cmd == 'list':
         return await agent.listing(req.get('source', 'photos'))
+    if cmd == 'browse':
+        return await agent.browse(req.get('path', ''))
     if cmd == 'pull':
         return await agent.pull(req['remote'], req['dest'])
     if cmd == 'rm':

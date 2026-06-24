@@ -52,6 +52,11 @@ export async function listItems(source: SourceKey): Promise<MediaItem[]> {
   return agent.tryCall<MediaItem[]>('list', { source }, [], 60000)
 }
 
+export async function browse(path: string): Promise<MediaItem[]> {
+  if (readSettings().demo) return []
+  return agent.tryCall<MediaItem[]>('browse', { path }, [], 30000)
+}
+
 export async function pair(): Promise<{ ok: boolean; message: string }> {
   if (readSettings().demo) return { ok: true, message: 'Modalità demo' }
   return agent.tryCall<{ ok: boolean; message: string }>(

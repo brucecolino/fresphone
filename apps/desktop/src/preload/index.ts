@@ -24,6 +24,7 @@ const api = {
   device: {
     status: (): Promise<unknown> => ipcRenderer.invoke('device:status'),
     list: (source: string): Promise<unknown[]> => ipcRenderer.invoke('device:list', source),
+    browse: (path: string): Promise<unknown[]> => ipcRenderer.invoke('device:browse', path),
     pair: (): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke('device:pair'),
   },
   media: {
