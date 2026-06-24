@@ -22,7 +22,7 @@ export async function SiteFooter() {
       links: [
         { href: '/#faq', label: f.links.faq },
         { href: '/#come-funziona', label: f.links.how },
-        { href: 'mailto:support@freshphone.app', label: f.links.support },
+        { href: 'mailto:support@freshphone.it', label: f.links.support },
       ],
     },
     {

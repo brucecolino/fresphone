@@ -13,7 +13,7 @@ export default function PrivacyPage() {
           ordini, licenze) tramite i nostri fornitori di pagamento e autenticazione.
         </p>
         <p className="mt-4 text-sm text-ink2">
-          Documento completo in preparazione, conforme al GDPR. Per richieste sui tuoi dati: support@freshphone.app.
+          Documento completo in preparazione, conforme al GDPR. Per richieste sui tuoi dati: support@freshphone.it.
         </p>
       </div>
     </section>
