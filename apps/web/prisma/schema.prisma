@@ -127,6 +127,7 @@ model VerificationToken {
 
 model Order {
   id                     String          @id @default(cuid())
+  orderNumber            String?         @unique // codice leggibile FP-AAAA-NNNN (ricerca admin + email cliente)
   user                   User?           @relation(fields: [userId], references: [id])
   userId                 String?
   email                  String

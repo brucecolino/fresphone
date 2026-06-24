@@ -23,7 +23,7 @@ async function sendCampaign(formData: FormData) {
     await sendMail({
       to: s.email,
       subject,
-      html: newsletterCampaignHtml({ message, promoCode, unsubUrl: `${site}/newsletter/unsubscribe?token=${s.unsubToken}` }),
+      html: newsletterCampaignHtml({ heading: subject, message, promoCode, unsubUrl: `${site}/newsletter/unsubscribe?token=${s.unsubToken}` }),
     })
   }
 

@@ -2,10 +2,25 @@ import type { PaymentProvider } from '@prisma/client'
 import { PLANS, type PlanId } from '@freshphone/shared'
 import { prisma } from '@/lib/db'
 import { issueLicense, sharedPlanToPrisma } from '@/lib/licensing'
-import { sendMail, licenseEmailHtml } from '@/lib/mail'
+import { sendMail, orderEmailHtml } from '@/lib/mail'
+
+const fmtDate = (d: Date) => new Intl.DateTimeFormat('it-IT', { dateStyle: 'long' }).format(d)
+
+// Numero d'ordine leggibile FP-AAAA-NNNN tramite sequenza Postgres (atomica).
+// La sequenza viene creata una volta sul DB; in caso eccezionale di assenza,
+// fallback su un valore basato su timestamp (comunque univoco).
+async function nextOrderNumber(): Promise<string> {
+  const year = new Date().getFullYear()
+  try {
+    const rows = await prisma.$queryRawUnsafe<{ n: bigint }[]>("SELECT nextval('fp_order_seq') AS n")
+    return `FP-${year}-${Number(rows[0].n)}`
+  } catch {
+    return `FP-${year}-${Date.now().toString().slice(-7)}`
+  }
+}
 
 // Evade pagamento -> ordine PAID + licenza + email. Idempotente sul providerCheckoutId
-// (i webhook possono essere ritentati: niente doppie licenze).
+// (i webhook possono essere ritentati: niente doppie licenze, niente doppi numeri).
 export async function fulfillOrder(params: {
   provider: PaymentProvider
   providerCheckoutId: string
@@ -17,6 +32,9 @@ export async function fulfillOrder(params: {
   cartId?: string | null
   promoCodeId?: string | null
 }) {
+  const existing = await prisma.order.findUnique({ where: { providerCheckoutId: params.providerCheckoutId } })
+  const orderNumber = existing?.orderNumber ?? (await nextOrderNumber())
+
   const order = await prisma.order.upsert({
     where: { providerCheckoutId: params.providerCheckoutId },
     update: {
@@ -24,6 +42,7 @@ export async function fulfillOrder(params: {
       providerSubscriptionId: params.providerSubscriptionId ?? undefined,
     },
     create: {
+      orderNumber,
       email: params.email,
       userId: params.userId ?? undefined,
       plan: sharedPlanToPrisma(params.plan),
@@ -41,8 +60,15 @@ export async function fulfillOrder(params: {
     license = await issueLicense({ plan: params.plan, userId: params.userId ?? null, orderId: order.id })
     await sendMail({
       to: params.email,
-      subject: 'La tua licenza FreshPhone',
-      html: licenseEmailHtml({ key: license.key, planName: PLANS[params.plan].name }),
+      subject: `Ordine ${order.orderNumber ?? ''} confermato — FreshPhone`,
+      html: orderEmailHtml({
+        orderNumber: order.orderNumber ?? order.id.slice(0, 8),
+        planName: PLANS[params.plan].name,
+        key: license.key,
+        amountEur: order.amountCents / 100,
+        dateStr: fmtDate(order.createdAt),
+        provider: order.provider,
+      }),
     })
     if (params.promoCodeId) {
       await prisma.promoCode

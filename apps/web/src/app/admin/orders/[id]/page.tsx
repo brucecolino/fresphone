@@ -5,7 +5,7 @@ import { PLANS, formatEur } from '@freshphone/shared'
 import { prisma } from '@/lib/db'
 import { requireAdmin } from '@/lib/admin'
 import { prismaPlanToShared } from '@/lib/licensing'
-import { sendMail, licenseEmailHtml } from '@/lib/mail'
+import { sendMail, orderEmailHtml } from '@/lib/mail'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,8 +24,15 @@ export default async function AdminOrderDetail({ params }: { params: Promise<{ i
     if (!o?.license) return
     await sendMail({
       to: o.email,
-      subject: 'La tua licenza FreshPhone',
-      html: licenseEmailHtml({ key: o.license.key, planName: PLANS[prismaPlanToShared(o.plan)].name }),
+      subject: `Ordine ${o.orderNumber ?? ''} confermato — FreshPhone`,
+      html: orderEmailHtml({
+        orderNumber: o.orderNumber ?? o.id.slice(0, 8),
+        planName: PLANS[prismaPlanToShared(o.plan)].name,
+        key: o.license.key,
+        amountEur: o.amountCents / 100,
+        dateStr: fmt(o.createdAt),
+        provider: o.provider,
+      }),
     })
     await prisma.license.update({ where: { id: o.license.id }, data: { lastResentAt: new Date() } })
     await prisma.auditLog.create({
@@ -59,11 +66,12 @@ export default async function AdminOrderDetail({ params }: { params: Promise<{ i
       <Link href="/admin/orders" className="text-sm text-ink2 hover:text-ink">
         ← Ordini
       </Link>
-      <h1 className="mt-2 text-2xl font-bold">Ordine {order.id.slice(0, 8)}</h1>
+      <h1 className="mt-2 text-2xl font-bold">Ordine {order.orderNumber ?? order.id.slice(0, 8)}</h1>
       <p className="mt-1 text-sm text-ink2">
         {PLANS[prismaPlanToShared(order.plan)].name} · {formatEur(order.amountCents / 100)} · {order.provider} · {order.status} ·{' '}
         {fmt(order.createdAt)}
       </p>
+      <p className="mt-0.5 text-xs text-ink2">Rif. interno: {order.id}</p>
 
       <div className="mt-6 rounded-xl2 border border-line bg-surface p-5">
         <h2 className="font-display font-semibold">Email cliente</h2>
