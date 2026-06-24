@@ -7,6 +7,9 @@ dist/
 out/
 .next/
 build/
+# eccezioni: build-resources dell'app desktop (icona app + script installer NSIS)
+!apps/desktop/build/
+!apps/desktop/build/**
 *.tsbuildinfo
 
 # env / secrets

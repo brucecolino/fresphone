@@ -17,6 +17,11 @@ extraResources:
     to: bin
     filter:
       - '**/*'
+  # Driver Apple (Apple Mobile Device Support) installati in automatico dall'installer.
+  - from: resources/drivers
+    to: drivers
+    filter:
+      - '**/*.msi'
 
 win:
   target: nsis
@@ -25,10 +30,14 @@ win:
 
 nsis:
   oneClick: false
-  perMachine: false
+  # perMachine: l'installer gira elevato (admin), necessario per installare i driver
+  # Apple (driver USB + servizio) in modo automatico e silenzioso.
+  perMachine: true
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   shortcutName: FreshPhone
+  # Script con la macro customInstall che installa i driver Apple se assenti.
+  include: build/installer.nsh
 
 # Registra il protocollo freshphone:// all'installazione (attivazione licenza da web).
 protocols:

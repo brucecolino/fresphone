@@ -4,7 +4,7 @@ import { readSettings, writeSettings, type ThemeSource } from './settings'
 import { getState, listItems, pair, thumb, capabilities } from './device/manager'
 import { probe } from './device/libimobiledevice'
 import { ensureOriginals } from './media/originals'
-import { installAppleDrivers } from './drivers/onboarding'
+import { installAppleDrivers, driversPresent } from './drivers/onboarding'
 import { exportSelection } from './transfer/export'
 import { removeSelection } from './transfer/remove'
 import { getLicenseStatus, activate, deactivate } from './license'
@@ -114,6 +114,7 @@ app.whenReady().then(() => {
     )
     e.sender.startDrag({ files, file: files[0], icon })
   })
+  ipcMain.handle('driver:status', () => ({ present: driversPresent() }))
   ipcMain.handle('driver:install', () => installAppleDrivers())
   ipcMain.handle('license:status', () => getLicenseStatus())
   ipcMain.handle('license:activate', (_e, key: string) => activate(key))

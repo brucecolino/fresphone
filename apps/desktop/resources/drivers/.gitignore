@@ -1,0 +1,6 @@
+# Il pacchetto driver Apple (Apple Mobile Device Support) è un asset di build,
+# non versionato: ~38MB e componente Apple ridistribuibile. Va presente sul
+# computer di build prima di creare l'installer (vedi README.md).
+*.msi
+!.gitignore
+!README.md

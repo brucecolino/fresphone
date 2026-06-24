@@ -31,6 +31,7 @@ const api = {
     capabilities: (): Promise<{ afc: boolean; ffmpeg: boolean }> => ipcRenderer.invoke('media:capabilities'),
   },
   driver: {
+    status: (): Promise<{ present: boolean }> => ipcRenderer.invoke('driver:status'),
     install: (): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke('driver:install'),
   },
   transfer: {

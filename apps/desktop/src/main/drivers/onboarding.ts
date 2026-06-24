@@ -1,27 +1,53 @@
-import { spawn } from 'node:child_process'
+import { app } from 'electron'
+import { spawn, spawnSync } from 'node:child_process'
+import { join } from 'node:path'
+import { existsSync } from 'node:fs'
 
-// Installer driver Apple di NelloKudo (scarica gli .inf dal Microsoft Update Catalog).
-// Richiede elevazione: lo avviamo via Start-Process -Verb RunAs (prompt UAC).
-const INSTALLER_URL =
-  'https://raw.githubusercontent.com/NelloKudo/Apple-Mobile-Drivers-Installer/main/AppleDrivInstaller.ps1'
+// I driver Apple (Apple Mobile Device Support: driver USB + servizio usbmuxd) sono
+// inclusi nell'installer e installati automaticamente al setup se assenti. Qui
+// gestiamo il rilevamento a runtime e un fallback (installazione dal pacchetto
+// incluso) per i casi in cui mancassero ancora.
 
+function driversDir(): string {
+  if (app.isPackaged) return join(process.resourcesPath, 'drivers')
+  return join(app.getAppPath(), 'resources', 'drivers')
+}
+
+function msiPath(): string {
+  return join(driversDir(), 'AppleMobileDeviceSupport64.msi')
+}
+
+/** True se l'Apple Mobile Device Service è installato (driver + usbmuxd presenti). */
+export function driversPresent(): boolean {
+  if (process.platform !== 'win32') return true
+  try {
+    const r = spawnSync('sc', ['query', 'Apple Mobile Device Service'], { encoding: 'utf8', windowsHide: true })
+    return r.status === 0
+  } catch {
+    return false
+  }
+}
+
+/** Installa i driver Apple dal pacchetto incluso, in modo silenzioso ed elevato (UAC). */
 export function installAppleDrivers(): { ok: boolean; message: string } {
   if (process.platform !== 'win32') return { ok: false, message: 'Disponibile solo su Windows' }
+  if (driversPresent()) return { ok: true, message: 'Driver Apple già presenti.' }
 
-  const inner = `iex (Invoke-RestMethod -Uri '${INSTALLER_URL}')`
-  const elevate = `Start-Process powershell -Verb RunAs -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-Command', ${JSON.stringify(
-    inner,
-  )})`
+  const msi = msiPath()
+  if (!existsSync(msi)) return { ok: false, message: 'Pacchetto driver non incluso in questa build.' }
 
+  // Avvio elevato e silenzioso di Apple Mobile Device Support.
+  const arg = msi.replace(/'/g, "''")
+  const ps = `Start-Process msiexec -Verb RunAs -Wait -ArgumentList @('/i','${arg}','/qn','/norestart')`
   try {
-    const child = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', elevate], {
+    const child = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', ps], {
       detached: true,
       stdio: 'ignore',
       windowsHide: false,
     })
     child.unref()
-    return { ok: true, message: 'Avvio dell’installer driver: conferma il prompt di Windows (UAC).' }
+    return { ok: true, message: 'Installazione driver Apple avviata: conferma il prompt di Windows.' }
   } catch (e) {
-    return { ok: false, message: `Impossibile avviare l’installer: ${String(e)}` }
+    return { ok: false, message: `Impossibile avviare l'installazione: ${String(e)}` }
   }
 }
