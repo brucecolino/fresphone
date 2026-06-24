@@ -4,26 +4,64 @@ import { cn } from '../lib/cn'
 import { useDevice } from '../store/device'
 import type { MediaItem } from '../types'
 
-// ===== cache anteprime (evita refetch quando i tile rientrano in vista) =====
+// ===== scheduler anteprime: priorità LIFO. Le tile diventate visibili (richieste
+// per ultime) vengono servite per prime; le richieste di tile non più montate
+// vengono saltate. Così scorrendo non restano riquadri vuoti. =====
 const thumbCache = new Map<string, string>()
-const inflight = new Map<string, Promise<string | null>>()
-function loadThumb(id: string): Promise<string | null> {
-  if (thumbCache.has(id)) return Promise.resolve(thumbCache.get(id) ?? null)
-  const existing = inflight.get(id)
-  if (existing) return existing
-  const p = window.fp.media
-    .thumb('photos', id, 384)
-    .then((s) => {
-      inflight.delete(id)
-      if (s) thumbCache.set(id, s as string)
-      return (s as string | null) ?? null
-    })
-    .catch(() => {
-      inflight.delete(id)
-      return null
-    })
-  inflight.set(id, p)
-  return p
+const subs = new Map<string, ((s: string | null) => void)[]>()
+const stack: string[] = []
+let inFlight = 0
+const MAX = 3
+
+function notify(id: string, s: string | null) {
+  const arr = subs.get(id)
+  if (!arr) return
+  subs.delete(id)
+  for (const f of arr) f(s)
+}
+function pump() {
+  while (inFlight < MAX && stack.length) {
+    const id = stack.pop() as string
+    if (!subs.has(id)) continue // nessun tile più interessato
+    const cached = thumbCache.get(id)
+    if (cached) {
+      notify(id, cached)
+      continue
+    }
+    inFlight++
+    window.fp.media
+      .thumb('photos', id, 384)
+      .then((s) => {
+        if (s) thumbCache.set(id, s as string)
+        notify(id, (s as string | null) ?? null)
+      })
+      .catch(() => notify(id, null))
+      .finally(() => {
+        inFlight--
+        pump()
+      })
+  }
+}
+function requestThumb(id: string, cb: (s: string | null) => void): () => void {
+  const cached = thumbCache.get(id)
+  if (cached) {
+    cb(cached)
+    return () => {}
+  }
+  const arr = subs.get(id) ?? []
+  arr.push(cb)
+  subs.set(id, arr)
+  const i = stack.indexOf(id)
+  if (i >= 0) stack.splice(i, 1)
+  stack.push(id) // priorità massima alla richiesta più recente
+  pump()
+  return () => {
+    const a = subs.get(id)
+    if (!a) return
+    const j = a.indexOf(cb)
+    if (j >= 0) a.splice(j, 1)
+    if (a.length === 0) subs.delete(id)
+  }
 }
 
 const fmtSize = (b: number) =>
@@ -48,7 +86,7 @@ const SORTS: { v: string; label: string }[] = [
   { v: 'size_desc', label: 'Dimensione (più grandi)' },
   { v: 'size_asc', label: 'Dimensione (più piccole)' },
 ]
-const CELL = [92, 124, 168, 230] // piccolissime → grandi
+const CELL = [44, 64, 92, 128, 175, 240] // da minuscole (≈20/fila) a grandi
 
 type Filter = 'all' | 'photo' | 'video'
 const chips: { k: Filter; label: string }[] = [
@@ -74,15 +112,14 @@ function Tile({
 }) {
   const [src, setSrc] = useState<string | null>(() => thumbCache.get(item.id) ?? null)
   useEffect(() => {
-    if (src) return
-    let alive = true
-    loadThumb(item.id).then((s) => {
-      if (alive) setSrc(s)
-    })
-    return () => {
-      alive = false
+    const cached = thumbCache.get(item.id)
+    if (cached) {
+      setSrc(cached)
+      return
     }
-  }, [item.id, src])
+    setSrc(null)
+    return requestThumb(item.id, setSrc)
+  }, [item.id])
 
   return (
     <button
@@ -225,7 +262,7 @@ export function Photos() {
   const [byMonth, setByMonth] = useState(false)
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [lastIndex, setLastIndex] = useState<number | null>(null)
-  const [zoom, setZoom] = useState(1)
+  const [zoom, setZoom] = useState(2)
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const [propsItem, setPropsItem] = useState<MediaItem | null>(null)
   const [viewerIdx, setViewerIdx] = useState<number | null>(null)
@@ -405,71 +442,84 @@ export function Photos() {
 
   return (
     <div ref={wrapRef} className="flex h-full flex-col">
-      <div className="border-b border-line p-4">
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="flex-1">
-            <h1 className="text-xl font-semibold">Foto e video</h1>
-            <p className="text-sm text-ink2">
+      <div className="border-b border-line px-4 py-3">
+        <div className="flex items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg font-semibold leading-tight">Foto e video</h1>
+            <p className="text-xs text-ink2">
               {loading ? 'Caricamento libreria…' : `${view.length} elementi`}
               {sel.size > 0 ? ` · ${sel.size} selezionati` : ''}
             </p>
           </div>
-          <label className="flex items-center gap-2 text-xs text-ink2">
-            <input type="checkbox" checked={byMonth} onChange={(e) => setByMonth(e.target.checked)} />
-            Dividi per mese
-          </label>
-          <select
-            value={sort}
-            onChange={(e) => setSort(e.target.value)}
-            className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm outline-none focus:border-brand"
-          >
-            {SORTS.map((s) => (
-              <option key={s.v} value={s.v}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-          <div className="flex items-center gap-1 rounded-lg border border-line p-0.5">
-            <button onClick={() => setZoom((z) => Math.max(0, z - 1))} className="rounded px-2 py-1 text-sm hover:bg-bg" title="Più piccole">
-              −
-            </button>
-            <button onClick={() => setZoom((z) => Math.min(CELL.length - 1, z + 1))} className="rounded px-2 py-1 text-sm hover:bg-bg" title="Più grandi (anche Ctrl+rotellina)">
-              +
-            </button>
-          </div>
+          {sel.size > 0 && (
+            <div className="flex items-center gap-2">
+              <button onClick={() => doExport(selIds())} disabled={busy} className="bg-grad h-8 rounded-lg px-3 text-xs font-semibold text-white disabled:opacity-60">
+                Esporta
+              </button>
+              <button onClick={() => doMove(selIds())} disabled={busy} className="h-8 rounded-lg border border-line px-3 text-xs hover:bg-bg disabled:opacity-60">
+                Sposta
+              </button>
+              <button onClick={() => doRemove(selIds())} disabled={busy} className="h-8 rounded-lg border border-line px-3 text-xs hover:bg-bg disabled:opacity-60">
+                Elimina
+              </button>
+              <button onClick={clearSel} className="h-8 rounded-lg border border-line px-3 text-xs hover:bg-bg">
+                Deseleziona
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          {chips.map((c) => (
+          <div className="inline-flex rounded-lg border border-line p-0.5">
+            {chips.map((c) => (
+              <button
+                key={c.k}
+                onClick={() => setFilter(c.k)}
+                className={cn(
+                  'rounded-md px-3 py-1 text-xs transition-colors',
+                  filter === c.k ? 'bg-pill font-medium text-pillt' : 'text-ink2 hover:text-ink',
+                )}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="ml-auto flex flex-wrap items-center gap-2">
             <button
-              key={c.k}
-              onClick={() => setFilter(c.k)}
+              onClick={() => setByMonth((v) => !v)}
               className={cn(
-                'rounded-full border px-3 py-1 text-xs transition-colors',
-                filter === c.k ? 'border-transparent bg-brand text-white' : 'border-line text-ink2',
+                'h-8 rounded-lg border px-3 text-xs transition-colors',
+                byMonth ? 'border-brand text-brand' : 'border-line text-ink2 hover:text-ink',
               )}
             >
-              {c.label}
+              Dividi per mese
             </button>
-          ))}
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            {sel.size > 0 ? (
-              <>
-                <button onClick={() => doExport(selIds())} disabled={busy} className="bg-grad rounded-full px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-60">
-                  Esporta
-                </button>
-                <button onClick={() => doMove(selIds())} disabled={busy} className="rounded-full border border-line px-3 py-1.5 text-xs hover:bg-bg disabled:opacity-60">
-                  Sposta
-                </button>
-                <button onClick={() => doRemove(selIds())} disabled={busy} className="rounded-full border border-line px-3 py-1.5 text-xs hover:bg-bg disabled:opacity-60">
-                  Elimina
-                </button>
-                <button onClick={clearSel} className="rounded-full border border-line px-3 py-1.5 text-xs">
-                  Deseleziona
-                </button>
-              </>
-            ) : (
-              <button onClick={selectAll} disabled={view.length === 0} className="rounded-full border border-line px-3 py-1.5 text-xs hover:bg-bg disabled:opacity-50">
+
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value)}
+              className="h-8 rounded-lg border border-line bg-surface px-2 text-xs outline-none focus:border-brand"
+            >
+              {SORTS.map((s) => (
+                <option key={s.v} value={s.v}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+
+            <div className="flex h-8 items-center rounded-lg border border-line">
+              <button onClick={() => setZoom((z) => Math.max(0, z - 1))} disabled={zoom === 0} className="px-2 text-base text-ink2 hover:text-ink disabled:opacity-30" title="Più piccole">
+                −
+              </button>
+              <span className="w-10 text-center text-[11px] text-ink2">{CELL[zoom]}px</span>
+              <button onClick={() => setZoom((z) => Math.min(CELL.length - 1, z + 1))} disabled={zoom === CELL.length - 1} className="px-2 text-base text-ink2 hover:text-ink disabled:opacity-30" title="Più grandi (anche Ctrl+rotellina)">
+                +
+              </button>
+            </div>
+
+            {sel.size === 0 && (
+              <button onClick={selectAll} disabled={view.length === 0} className="h-8 rounded-lg border border-line px-3 text-xs hover:bg-bg disabled:opacity-50">
                 Seleziona tutto
               </button>
             )}
