@@ -9,6 +9,8 @@ import { Wizard } from './views/wizard'
 import { Spazio } from './views/spazio'
 import { Settings } from './views/settings'
 import { UpdateBanner } from './components/UpdateBanner'
+import { WhatsNew } from './components/WhatsNew'
+import { useWhatsNew } from './store/whatsnew'
 
 export default function App() {
   const init = useTheme((s) => s.init)
@@ -20,6 +22,20 @@ export default function App() {
     dev.start() // polling continuo del dispositivo per tutta la vita dell'app
     return () => dev.stop()
   }, [init])
+
+  useEffect(() => {
+    // "Novità" dopo un aggiornamento: se la versione è cambiata rispetto all'ultima
+    // vista, mostra il pannello una volta e memorizza la versione corrente.
+    Promise.all([window.fp.updates.version(), window.fp.settings.get()])
+      .then(([v, s]) => {
+        const seen = (s as { whatsNewSeenVersion?: string }).whatsNewSeenVersion
+        if (v && v !== seen) {
+          useWhatsNew.getState().show()
+          void window.fp.settings.set({ whatsNewSeenVersion: v })
+        }
+      })
+      .catch(() => undefined)
+  }, [])
 
   return (
     <div className="flex h-full flex-col bg-bg text-ink">
@@ -35,6 +51,7 @@ export default function App() {
         </main>
       </div>
       <UpdateBanner />
+      <WhatsNew />
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTheme } from '../store/theme'
+import { useWhatsNew } from '../store/whatsnew'
 import { cn } from '../lib/cn'
 
 const modes = [
@@ -198,6 +199,12 @@ export function Settings() {
               Aggiorna e riavvia
             </button>
           )}
+          <button
+            onClick={() => useWhatsNew.getState().show()}
+            className="rounded-lg border border-line px-4 py-2 text-sm hover:bg-bg"
+          >
+            Novità di questa versione
+          </button>
         </div>
         {upState === 'none' && <p className="mt-2 text-xs text-ink2">Sei già all’ultima versione.</p>}
         {upState === 'available' && upInfo.notes && <p className="mt-2 whitespace-pre-line text-xs text-ink2">{upInfo.notes}</p>}
