@@ -23,6 +23,8 @@ export interface Settings {
   license?: StoredLicense
   /** File esportati in versione gratuita (limite prova). */
   freeExportsUsed?: number
+  /** Ultima versione per cui è stato mostrato il pannello "Novità". */
+  whatsNewSeenVersion?: string
 }
 
 const defaults: Settings = { theme: 'system', language: 'it', demo: false }
