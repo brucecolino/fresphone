@@ -17,7 +17,7 @@ export default async function DownloadPage() {
         <p className="mt-4 text-ink2">{d.sub}</p>
         <div className="mt-8 flex flex-col items-center gap-3">
           <Link
-            href="https://github.com/brucecolino/freshphone/releases"
+            href="https://github.com/brucecolino/freshphone/releases/latest"
             className="bg-grad inline-flex items-center rounded-full px-7 py-3.5 text-sm font-semibold text-white transition-[filter] hover:brightness-110"
           >
             {d.button}
